@@ -1,12 +1,16 @@
 import os
 import cv2
 from flask import Flask, Response, render_template
+from deepface import DeepFace
+import numpy as np
 
 # Initialize the Flask app
 app = Flask(__name__)
 
 # Face detection cascade classifier path (adjust if needed)
 face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
+
+emotion_model = DeepFace.build_model('Emotion')
 
 
 def generate_frames():
@@ -40,6 +44,18 @@ def generate_frames():
         # Draw rectangles around detected faces
         for (x, y, w, h) in faces:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
+            
+            face_crop = np.copy(frame[y:y+h, x:x+w])
+            try:
+                # Detect emotions in the face
+                emotions = DeepFace.analyze(face_crop, actions=['emotion'], enforce_detection=False)
+
+                # Display the emotions on the frame
+                cv2.putText(frame, emotions[0]['dominant_emotion'], (x, y-30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)        
+            except Exception as e:
+                print("An error occurred: ", e)
+
+                
 
         # Encode frame in JPEG format
         ret, buffer = cv2.imencode('.jpg', frame)

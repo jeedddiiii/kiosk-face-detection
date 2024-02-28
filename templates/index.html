@@ -1,12 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Live Webcam Stream</title>
+    <meta charset="UTF-8">
+    <title>Live Webcam Stream with Emotion Detection</title>
 </head>
 <body>
-  <h1>Live Webcam Stream</h1>
-  <img src="{{ url_for('video') }}" alt="Live Webcam Stream">
-  
+    <h1>Live Webcam Stream</h1>
+    <img id="video_stream" src="{{ url_for('video') }}" alt="Live Webcam Stream">
+    <p id="emotion_display"></p>
+
+    <script>
+        const video = document.getElementById('video_stream');
+        const emotionDisplay = document.getElementById('emotion_display');
+
+        video.onplay = function() {
+            const chunks = [];
+            const source = new EventSource("/video");
+
+            source.onmessage = function(event) {
+                chunks.push(event.data);
+                const fullFrame = chunks.join('');
+                chunks = [];
+
+                video.srcObject = new Blob([fullFrame], { type: 'image/jpeg' });
+            };
+
+            source.onerror = function(error) {
+                console.error("Error:", error);
+                emotionDisplay.textContent = "Error: Could not receive video stream.";
+            };
+        };
+
+        source.onmessage = function(event) {
+            const emotion = event.data.split('Emotion: ')[1].split(' (')[0];
+            emotionDisplay.textContent = `Detected Emotion: ${emotion}`;
+        };
+    </script>
 </body>
 </html>

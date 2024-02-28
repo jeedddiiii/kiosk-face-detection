@@ -4,6 +4,7 @@ import cv2
 # Initialize the Flask app
 app = Flask(__name__)
 
+
 def generate_frames():
   # Initialize video capture
   cap = cv2.VideoCapture(0)

@@ -12,6 +12,7 @@
     <p id="emotion"></p>
     <p id="date_time"></p>
     <p id="text"></p>
+    <img id="image" />
 
     <script>
         const video = document.getElementById('video_stream');
@@ -26,6 +27,9 @@
                     document.getElementById('emotion').textContent = data.emotion;
                     document.getElementById('date_time').textContent = data.date_time;
                     document.getElementById('text').textContent = data.text;
+                    if (data.image) {
+                document.getElementById('image').src = 'data:image/jpeg;base64,' + data.image;
+            }
                 });
         }, 1000);  // Fe
 

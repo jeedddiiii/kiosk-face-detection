@@ -1,6 +1,6 @@
 import os
 import cv2
-from flask import Flask, Response, render_template
+from flask import Flask, Response, render_template, jsonify
 from deepface import DeepFace
 import numpy as np
 
@@ -21,10 +21,13 @@ id = 0
 # Don't forget to add names associated with user IDs
 names = ['None', 'Pang','Jedi', 'Aomsun', 'pa', 'Poon']
 
-
+current_name = "Unknown"
+current_emotion = "Unknown"
 
 
 def generate_frames():
+    global current_name, current_emotion
+
     # Initialize video capture
     cap = cv2.VideoCapture(0)
 
@@ -62,6 +65,7 @@ def generate_frames():
             try:
                 # Detect emotions in the face
                 emotions = DeepFace.analyze(face_crop, actions=['emotion'], enforce_detection=False)
+                current_emotion = emotions[0]['dominant_emotion']
 
 
                 cv2.putText(frame, emotions[0]['dominant_emotion'], (x, y-30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)        
@@ -76,6 +80,8 @@ def generate_frames():
                 try:
                     # Recognized face
                     name = names[id]
+                    current_name = names[id]
+
                     confidence = "  {0}%".format(round(confidence))
                 except IndexError as e:
                     name = "Who?"
@@ -109,6 +115,12 @@ def index():
 def video():
     # Video streaming route
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/data')
+def data():
+    # Return the current name and emotion as JSON
+    return jsonify(name=current_name, emotion=current_emotion)
+
 
 
 if __name__ == '__main__':

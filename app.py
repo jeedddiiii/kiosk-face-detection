@@ -3,6 +3,8 @@ import cv2
 from flask import Flask, Response, render_template, jsonify
 from deepface import DeepFace
 import numpy as np
+import datetime
+
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -23,10 +25,12 @@ names = ['None', 'Pang','Jedi', 'Aomsun', 'pa', 'Poon']
 
 current_name = "Unknown"
 current_emotion = "Unknown"
+current_date_time = ""
+
 
 
 def generate_frames():
-    global current_name, current_emotion
+    global current_name, current_emotion, current_date_time
 
     # Initialize video capture
     cap = cv2.VideoCapture(0)
@@ -90,6 +94,7 @@ def generate_frames():
                 # Unknown face
                 name = "Who?"
                 confidence = "N/A"
+            current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             cv2.putText(frame, name, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             cv2.putText(frame, confidence, (x + 5, y + h - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 1)
@@ -119,7 +124,7 @@ def video():
 @app.route('/data')
 def data():
     # Return the current name and emotion as JSON
-    return jsonify(name=current_name, emotion=current_emotion)
+    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time)
 
 
 

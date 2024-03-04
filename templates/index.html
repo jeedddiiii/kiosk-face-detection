@@ -10,6 +10,7 @@
     <img id="video_stream" src="{{ url_for('video') }}" alt="Live Webcam Stream">
     <p id="name"></p>
     <p id="emotion"></p>
+    <p id="date_time"></p>
 
     <script>
         const video = document.getElementById('video_stream');
@@ -22,6 +23,7 @@
                     // Update the page with the new data
                     document.getElementById('name').textContent = data.name;
                     document.getElementById('emotion').textContent = data.emotion;
+                    document.getElementById('date_time').textContent = data.date_time;
                 });
         }, 1000);  // Fe
 

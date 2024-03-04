@@ -26,11 +26,12 @@ names = ['None', 'Pang','Jedi', 'Aomsun', 'pa', 'Poon']
 current_name = "Unknown"
 current_emotion = "Unknown"
 current_date_time = ""
+current_text = ""
 
 
 
 def generate_frames():
-    global current_name, current_emotion, current_date_time
+    global current_name, current_emotion, current_date_time, current_text
 
     # Initialize video capture
     cap = cv2.VideoCapture(0)
@@ -95,6 +96,20 @@ def generate_frames():
                 name = "Who?"
                 confidence = "N/A"
             current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if current_emotion == "happy":
+                current_text = "ยิ้มหาพ่อเธอหรือ"
+            elif current_emotion == "angry":
+                current_text = "หน้าบึ้งหาพ่อเธอหรือ"
+            elif current_emotion == "fear":
+                current_text = "กลัวหาพ่อเธอหรือ"
+            elif current_emotion == "sad":
+                current_text = "เศร้าหาพ่อเธอหรือ"
+            elif current_emotion == "surprise":
+                current_text = "แปลกหาพ่อเธอหรือ"
+            elif current_emotion == "neutral":
+                current_text = "เฉยๆหาพ่อเธอหรือ"
+            elif current_emotion == "disgust":
+                current_text = "เกลียดหาพ่อเธอหรือ"
 
             cv2.putText(frame, name, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             cv2.putText(frame, confidence, (x + 5, y + h - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 1)
@@ -124,7 +139,7 @@ def video():
 @app.route('/data')
 def data():
     # Return the current name and emotion as JSON
-    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time)
+    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time, text=current_text)
 
 
 

@@ -11,6 +11,7 @@
     <p id="name"></p>
     <p id="emotion"></p>
     <p id="date_time"></p>
+    <p id="text"></p>
 
     <script>
         const video = document.getElementById('video_stream');
@@ -24,6 +25,7 @@
                     document.getElementById('name').textContent = data.name;
                     document.getElementById('emotion').textContent = data.emotion;
                     document.getElementById('date_time').textContent = data.date_time;
+                    document.getElementById('text').textContent = data.text;
                 });
         }, 1000);  // Fe
 

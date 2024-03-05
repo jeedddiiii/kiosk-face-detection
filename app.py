@@ -30,9 +30,10 @@ current_emotion = "Unknown"
 current_date_time = ""
 current_text = ""
 current_image = None
+current_face = None
 
 def generate_frames():
-    global current_name, current_emotion, current_date_time, current_text, current_image
+    global current_name, current_emotion, current_date_time, current_text, current_image, current_face
 
     # Initialize video capture
     cap = cv2.VideoCapture(0)
@@ -101,6 +102,12 @@ def generate_frames():
             if is_success:
                 io_buf = io.BytesIO(buffer)
                 current_image = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+
+            is_success, buffer = cv2.imencode(".jpg", face_crop)
+            if is_success:
+                io_buf = io.BytesIO(buffer)
+                current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+
             
             current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
@@ -147,7 +154,7 @@ def video():
 @app.route('/data')
 def data():
     # Return the current name and emotion as JSON
-    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time, text=current_text, image=current_image)
+    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time, text=current_text, image=current_image, face=current_face)
 
 
 

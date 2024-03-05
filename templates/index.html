@@ -13,6 +13,7 @@
     <p id="date_time"></p>
     <p id="text"></p>
     <img id="image" />
+    <img id="face" />
 
     <script>
         const video = document.getElementById('video_stream');
@@ -28,8 +29,11 @@
                     document.getElementById('date_time').textContent = data.date_time;
                     document.getElementById('text').textContent = data.text;
                     if (data.image) {
-                document.getElementById('image').src = 'data:image/jpeg;base64,' + data.image;
-            }
+                        document.getElementById('image').src = 'data:image/jpeg;base64,' + data.image;
+                    }
+                    if (data.face) {
+                        document.getElementById('face').src = 'data:face/jpeg;base64,' + data.face;
+                    }
                 });
         }, 1000);  // Fe
 

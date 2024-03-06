@@ -28,6 +28,24 @@ current_text = ""
 current_image = None
 current_face = None
 
+def analyze_emotion(face_crop):
+    try:
+        # Detect emotions in the face
+        emotions = DeepFace.analyze(face_crop, actions=['emotion'], enforce_detection=False)
+        return emotions[0]['dominant_emotion']
+    except Exception as e:
+        print("An error occurred in emotion analysis: ", e)
+        return "Unknown"
+
+def recognize_face(face_crop):
+    try:
+        people = DeepFace.find(img_path=face_crop, db_path="img/", model_name=models[0], distance_metric=metrics[0], enforce_detection=False)
+        return people
+    except Exception as e:
+        print("Error in face recognition:", str(e))
+        return []
+
+
 def generate_frames():
     global current_name, current_emotion, current_date_time, current_text, current_image, current_face
 
@@ -64,19 +82,13 @@ def generate_frames():
 
             
             face_crop = np.copy(frame[y:y+h, x:x+w])
-            try:
-                # Detect emotions in the face
-                emotions = DeepFace.analyze(face_crop, actions=['emotion'], enforce_detection=False)
-                current_emotion = emotions[0]['dominant_emotion']
 
-                # Display the emotions on the frame
-            except Exception as e:
-                print("An error occurred: ", e)
+            # Analyze emotion
+            current_emotion = analyze_emotion(face_crop)
 
-            try:
-                people = DeepFace.find(img_path=frame, db_path="img/", model_name=models[0], distance_metric=metrics[0], enforce_detection=False)
-            except Exception as e:
-                print("Error in face recognition:", str(e))
+            # Recognize face
+            people = recognize_face(face_crop)
+           
 
             for person in people:
                 if not person['source_x'].empty:

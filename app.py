@@ -20,14 +20,6 @@ backends = ['opencv', 'ssd', 'dlib', 'mtcnn', 'retinaface']
 models = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace', 'DeepID', 'Dlib', 'ArcFace', 'SFace', 'Facenet512']
 metrics = ['cosine', 'euclidean', 'euclidean_l2']
 
-recognizer = cv2.face.LBPHFaceRecognizer_create()
-recognizer.read('trainer.yml')
-print(recognizer)
-
-# Initialize user IDs and associated names
-id = 0
-# Don't forget to add names associated with user IDs
-names = ['None', 'Pang','Jedi', 'Aomsun', 'pa', 'Poon']
 
 current_name = "Unknown"
 current_emotion = "Unknown"

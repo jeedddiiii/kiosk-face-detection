@@ -6,10 +6,48 @@ import numpy as np
 import datetime
 import base64
 import io
+import psycopg2
+
+# PostgreSQL database configuration
+db_config = {
+    'dbname': 'postgres',
+    'user': 'postgres',
+    'password': 'jedi2002',
+    'host': 'localhost',
+    'port': '5432'
+}
+
 
 
 # Initialize the Flask app
 app = Flask(__name__)
+
+# Check PostgreSQL connection
+def check_postgres_connection():
+    try:
+        # Connect to the PostgreSQL database
+        connection = psycopg2.connect(**db_config)
+
+        # Create a cursor
+        cursor = connection.cursor()
+
+        # Print a success message
+        print("Connected to PostgreSQL successfully!")
+
+    except Exception as e:
+        # Print an error message
+        print(f"Error connecting to PostgreSQL: {str(e)}")
+
+    finally:
+        # Close the cursor and connection
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+# Check PostgreSQL connection when the application starts
+check_postgres_connection()
+
 
 # Face detection cascade classifier path (adjust if needed)
 face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
@@ -166,6 +204,10 @@ def data():
     # Return the current name and emotion as JSON
     return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time, text=current_text, image=current_image, face=current_face)
 
+@app.route('/check_db_connection')
+def check_db_connection():
+    check_postgres_connection()
+    return "Check the console for connection status."
 
 
 if __name__ == '__main__':

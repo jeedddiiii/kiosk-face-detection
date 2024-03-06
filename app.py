@@ -16,6 +16,10 @@ face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface
 
 emotion_model = DeepFace.build_model('Emotion')
 
+backends = ['opencv', 'ssd', 'dlib', 'mtcnn', 'retinaface']
+models = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace', 'DeepID', 'Dlib', 'ArcFace', 'SFace', 'Facenet512']
+metrics = ['cosine', 'euclidean', 'euclidean_l2']
+
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 recognizer.read('trainer.yml')
 print(recognizer)
@@ -65,7 +69,6 @@ def generate_frames():
         # Draw rectangles around detected faces
         for (x, y, w, h) in faces:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
-            id, confidence = recognizer.predict(gray[y:y + h, x:x + w])
 
             
             face_crop = np.copy(frame[y:y+h, x:x+w])
@@ -74,29 +77,35 @@ def generate_frames():
                 emotions = DeepFace.analyze(face_crop, actions=['emotion'], enforce_detection=False)
                 current_emotion = emotions[0]['dominant_emotion']
 
-
-                cv2.putText(frame, emotions[0]['dominant_emotion'], (x, y-30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)        
-
-
                 # Display the emotions on the frame
             except Exception as e:
                 print("An error occurred: ", e)
 
-            # Proba greater than 40
-            if confidence > 40:
-                try:
-                    # Recognized face
-                    name = names[id]
-                    current_name = names[id]
+            try:
+                people = DeepFace.find(img_path=frame, db_path="img/", model_name=models[0], distance_metric=metrics[0], enforce_detection=False)
+            except Exception as e:
+                print("Error in face recognition:", str(e))
 
-                    confidence = "  {0}%".format(round(confidence))
-                except IndexError as e:
-                    name = "Who?"
-                    confidence = "N/A"
-            else:
-                # Unknown face
-                name = "Who?"
-                confidence = "N/A"
+            for person in people:
+                if not person['source_x'].empty:
+                    x = person['source_x'][0]
+                    y = person['source_y'][0]
+                    w = person['source_w'][0]
+                    h = person['source_h'][0]
+
+                    try:
+                        distance = person['target_x'][0]
+                        print("Distance:", distance)  # Add this line for debugging
+
+                        if distance > 1:
+                            current_name = person['identity'][0].split('/')[1]
+                        else:
+                            current_name = "Unknown"
+                        cv2.putText(frame, current_name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                    except KeyError:
+                        current_name = "Unknown"
+                        print("Distance not found")
+                        cv2.putText(frame, current_name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
             
             is_success, buffer = cv2.imencode(".jpg", frame)
             if is_success:
@@ -125,9 +134,6 @@ def generate_frames():
                 current_text = "เฉยๆหาพ่อเธอหรือ"
             elif current_emotion == "disgust":
                 current_text = "เกลียดหาพ่อเธอหรือ"
-
-            cv2.putText(frame, name, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(frame, confidence, (x + 5, y + h - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 1)
 
         # Encode frame in JPEG format
         ret, buffer = cv2.imencode('.jpg', frame)

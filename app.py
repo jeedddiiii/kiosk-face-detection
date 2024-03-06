@@ -10,7 +10,7 @@ import psycopg2
 
 # PostgreSQL database configuration
 db_config = {
-    'dbname': 'postgres',
+    'dbname': 'facedetection',
     'user': 'postgres',
     'password': 'jedi2002',
     'host': 'localhost',
@@ -24,6 +24,9 @@ app = Flask(__name__)
 
 # Check PostgreSQL connection
 def check_postgres_connection():
+    connection = None  # Initialize connection outside the try block
+    cursor = None
+
     try:
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(**db_config)
@@ -47,7 +50,6 @@ def check_postgres_connection():
 
 # Check PostgreSQL connection when the application starts
 check_postgres_connection()
-
 
 # Face detection cascade classifier path (adjust if needed)
 face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
@@ -176,6 +178,41 @@ def generate_frames():
                 current_text = "เฉยๆหาพ่อเธอหรือ"
             elif current_emotion == "disgust":
                 current_text = "เกลียดหาพ่อเธอหรือ"
+
+            try:
+                # Connect to the PostgreSQL database
+                connection = psycopg2.connect(**db_config)
+
+                # Create a cursor
+                cursor = connection.cursor()
+
+                # SQL INSERT statement
+                insert_query = """
+                    INSERT INTO transactions (
+                        transaction_id, name, date_time, emotion, source_id, face_img, environment_img
+                    ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
+                """
+                data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
+
+                # Execute the query
+                cursor.execute(insert_query, data_to_insert)
+
+                # Commit the changes
+                connection.commit()
+
+                # Print a success message
+                print("Data inserted into the database successfully!")
+
+            except Exception as e:
+                # Print an error message
+                print(f"Error inserting data into the database: {str(e)}")
+
+            finally:
+                # Close the cursor and connection
+                if cursor:
+                    cursor.close()
+                if connection:
+                    connection.close()
 
         # Encode frame in JPEG format
         ret, buffer = cv2.imencode('.jpg', frame)

@@ -92,6 +92,8 @@ def generate_frames():
     # Initialize video capture
     cap = cv2.VideoCapture(0)
 
+    face_cascade = cv2.CascadeClassifier(face_cascade_path)
+
     while True:
         # Capture frame-by-frame
         ret, frame = cap.read()
@@ -100,18 +102,6 @@ def generate_frames():
 
         # Convert frame to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Ensure we have the face cascade classifier downloaded
-        if not os.path.exists(face_cascade_path):
-            print("Downloading face cascade classifier...")
-            cv2.dnn_fetchNetFromURL(
-                'https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml',
-                face_cascade_path,
-                cv2.dnn.FetchNetFromURL_METHOD_HTTP)
-            print("Download complete.")
-
-        # Load the face cascade classifier
-        face_cascade = cv2.CascadeClassifier(face_cascade_path)
 
         # Detect faces
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))

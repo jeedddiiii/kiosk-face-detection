@@ -61,7 +61,7 @@ models = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace', 'DeepID', 'Dlib', 'ArcF
 metrics = ['cosine', 'euclidean', 'euclidean_l2']
 
 
-current_name = "Unknown"
+current_name = ""
 current_emotion = "Unknown"
 current_date_time = ""
 current_text = ""
@@ -85,9 +85,9 @@ def recognize_face(face_crop):
         print("Error in face recognition:", str(e))
         return []
 
-
+previous_name = "Unknown"
 def generate_frames():
-    global current_name, current_emotion, current_date_time, current_text, current_image, current_face
+    global current_name, current_emotion, current_date_time, current_text, current_image, current_face, previous_name
 
     # Initialize video capture
     cap = cv2.VideoCapture(0)
@@ -122,13 +122,9 @@ def generate_frames():
 
             
             face_crop = np.copy(frame[y:y+h, x:x+w])
-
-            # Analyze emotion
-            current_emotion = analyze_emotion(face_crop)
-
             # Recognize face
             people = recognize_face(face_crop)
-           
+            
 
             for person in people:
                 if not person['source_x'].empty:
@@ -145,74 +141,77 @@ def generate_frames():
                             current_name = person['identity'][0].split('/')[1]
                         else:
                             current_name = "Unknown"
-                        cv2.putText(frame, current_name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
                     except KeyError:
-                        current_name = "Unknown"
+                        current_name = "Unknown"                           
                         print("Distance not found")
-                        cv2.putText(frame, current_name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-            
-            is_success, buffer = cv2.imencode(".jpg", frame)
-            if is_success:
-                io_buf = io.BytesIO(buffer)
-                current_image = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+            if current_name != previous_name:
+                # Analyze emotion
+                current_emotion = analyze_emotion(face_crop)
+                # Update the previous name
+                previous_name = current_name
 
-            is_success, buffer = cv2.imencode(".jpg", face_crop)
-            if is_success:
-                io_buf = io.BytesIO(buffer)
-                current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+                is_success, buffer = cv2.imencode(".jpg", frame)
+                if is_success:
+                    io_buf = io.BytesIO(buffer)
+                    current_image = base64.b64encode(io_buf.getvalue()).decode('utf-8')
 
-            
-            current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            if current_emotion == "happy":
-                current_text = "ยิ้มหาพ่อเธอหรือ"
-            elif current_emotion == "angry":
-                current_text = "หน้าบึ้งหาพ่อเธอหรือ"
-            elif current_emotion == "fear":
-                current_text = "กลัวหาพ่อเธอหรือ"
-            elif current_emotion == "sad":
-                current_text = "เศร้าหาพ่อเธอหรือ"
-            elif current_emotion == "surprise":
-                current_text = "แปลกหาพ่อเธอหรือ"
-            elif current_emotion == "neutral":
-                current_text = "เฉยๆหาพ่อเธอหรือ"
-            elif current_emotion == "disgust":
-                current_text = "เกลียดหาพ่อเธอหรือ"
+                is_success, buffer = cv2.imencode(".jpg", face_crop)
+                if is_success:
+                    io_buf = io.BytesIO(buffer)
+                    current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
 
-            try:
-                # Connect to the PostgreSQL database
-                connection = psycopg2.connect(**db_config)
+                
+                current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                if current_emotion == "happy":
+                    current_text = "ยิ้มหาพ่อเธอหรือ"
+                elif current_emotion == "angry":
+                    current_text = "หน้าบึ้งหาพ่อเธอหรือ"
+                elif current_emotion == "fear":
+                    current_text = "กลัวหาพ่อเธอหรือ"
+                elif current_emotion == "sad":
+                    current_text = "เศร้าหาพ่อเธอหรือ"
+                elif current_emotion == "surprise":
+                    current_text = "แปลกหาพ่อเธอหรือ"
+                elif current_emotion == "neutral":
+                    current_text = "เฉยๆหาพ่อเธอหรือ"
+                elif current_emotion == "disgust":
+                    current_text = "เกลียดหาพ่อเธอหรือ"
 
-                # Create a cursor
-                cursor = connection.cursor()
+                try:
+                    # Connect to the PostgreSQL database
+                    connection = psycopg2.connect(**db_config)
 
-                # SQL INSERT statement
-                insert_query = """
-                    INSERT INTO transactions (
-                        transaction_id, name, date_time, emotion, source_id, face_img, environment_img
-                    ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
-                """
-                data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
+                    # Create a cursor
+                    cursor = connection.cursor()
 
-                # Execute the query
-                cursor.execute(insert_query, data_to_insert)
+                    # SQL INSERT statement
+                    insert_query = """
+                        INSERT INTO transactions (
+                            transaction_id, name, date_time, emotion, source_id, face_img, environment_img
+                        ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
+                    """
+                    data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
 
-                # Commit the changes
-                connection.commit()
+                    # Execute the query
+                    cursor.execute(insert_query, data_to_insert)
 
-                # Print a success message
-                print("Data inserted into the database successfully!")
+                    # Commit the changes
+                    connection.commit()
 
-            except Exception as e:
-                # Print an error message
-                print(f"Error inserting data into the database: {str(e)}")
+                    # Print a success message
+                    print("Data inserted into the database successfully!")
 
-            finally:
-                # Close the cursor and connection
-                if cursor:
-                    cursor.close()
-                if connection:
-                    connection.close()
+                except Exception as e:
+                    # Print an error message
+                    print(f"Error inserting data into the database: {str(e)}")
+
+                finally:
+                    # Close the cursor and connection
+                    if cursor:
+                        cursor.close()
+                    if connection:
+                        connection.close()
 
         # Encode frame in JPEG format
         ret, buffer = cv2.imencode('.jpg', frame)
@@ -239,7 +238,7 @@ def video():
 @app.route('/data')
 def data():
     # Return the current name and emotion as JSON
-    return jsonify(name=current_name, emotion=current_emotion, date_time=current_date_time, text=current_text, image=current_image, face=current_face)
+    return jsonify(name=current_name, date_time=current_date_time, text=current_text, face=current_face)
 
 @app.route('/check_db_connection')
 def check_db_connection():

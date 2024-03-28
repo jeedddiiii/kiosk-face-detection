@@ -6,8 +6,14 @@ import numpy as np
 import datetime
 import base64
 import io
+import pyttsx3
 import psycopg2
+from sklearn.metrics.pairwise import cosine_similarity
+import datetime
+import threading
+import queue
 
+TH_voice_id = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_THAI"
 # PostgreSQL database configuration
 db_config = {
     'dbname': 'facedetection',
@@ -16,8 +22,6 @@ db_config = {
     'host': 'localhost',
     'port': '5432'
 }
-
-
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -60,13 +64,15 @@ backends = ['opencv', 'ssd', 'dlib', 'mtcnn', 'retinaface']
 models = ['VGG-Face', 'Facenet', 'OpenFace', 'DeepFace', 'DeepID', 'Dlib', 'ArcFace', 'SFace', 'Facenet512']
 metrics = ['cosine', 'euclidean', 'euclidean_l2']
 
-
 current_name = ""
 current_emotion = "Unknown"
 current_date_time = ""
 current_text = ""
 current_image = None
 current_face = None
+
+face_queue = queue.Queue()
+emotion_queue = queue.Queue()
 
 def analyze_emotion(face_crop):
     try:
@@ -86,13 +92,130 @@ def recognize_face(face_crop):
         return []
 
 previous_name = "Unknown"
+last_face_detection_time = datetime.datetime.now()
+
+def recognize_face_thread():
+    global current_name, last_face_detection_time
+
+    while True:
+        face_crop = face_queue.get()
+
+        # ตรวจสอบเวลาที่ตรวจจับหน้าล่าสุด
+        current_time = datetime.datetime.now()
+        time_difference = current_time - last_face_detection_time
+        if time_difference.total_seconds() < 3:
+            # ถ้ายังไม่ผ่านเวลาสามวินาทีให้ข้ามการประมวลผล
+            face_queue.task_done()
+            continue 
+
+        people = recognize_face(face_crop)
+        if people:
+            current_name = people[0]['identity'][0].split('/')[1]
+        else:
+            current_name = "Unknown"
+
+        # อัปเดตเวลาที่ตรวจจับหน้าล่าสุด
+        last_face_detection_time = datetime.datetime.now()
+        
+        emotion_queue.put((current_name, face_crop))
+        face_queue.task_done()
+
+def analyze_emotion_thread():
+    global current_emotion, current_date_time, current_text, current_image, current_face, previous_name
+    while True:
+        current_name, face_crop = emotion_queue.get()
+    
+        current_emotion = analyze_emotion(face_crop)
+
+        if current_name != previous_name:
+            is_success, buffer = cv2.imencode(".jpg", frame)
+            if is_success:
+                io_buf = io.BytesIO(buffer)
+                current_image = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+            # Convert face crop image to base64
+            is_success, buffer = cv2.imencode(".jpg", face_crop)
+            if is_success:
+                io_buf = io.BytesIO(buffer)
+                current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
+                
+
+            # Update current date and time
+            current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            if current_emotion == "happy":
+                current_text = "ดูท่าคุณจะดีใจมากเลยนะ"
+            elif current_emotion == "angry":
+                current_text = "คุณดูโกรธมากเลย มีอะไรให้ช่วยบ้างไหม"
+            elif current_emotion == "fear":
+                current_text = "อย่ากลัวนะ ไม่มีอะไรน่ากลัว"
+            elif current_emotion == "sad":
+                current_text = "คุณดูเศร้ามาก มีอะไรให้ช่วยปลอบใจบ้างไหม"
+            elif current_emotion == "surprise":
+                current_text = "ว้าว! คุณดูตกใจมาก"
+            elif current_emotion == "neutral":
+                current_text = "สบายดีนะ"
+            elif current_emotion == "disgust":
+                current_text = "คุณดูรังเกียจบางอย่างเหรอ"
+
+            jarvis(current_text)
+
+            try:
+                # Connect to the PostgreSQL database
+                connection = psycopg2.connect(**db_config)
+
+                # Create a cursor
+                cursor = connection.cursor()
+
+                # SQL INSERT statement
+                insert_query = """
+                    INSERT INTO transactions (
+                        transaction_id, name, date_time, emotion, source_id, face_img, environment_img
+                    ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
+                """
+                data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
+
+                # Execute the query
+                cursor.execute(insert_query, data_to_insert)
+
+                # Commit the changes
+                connection.commit()
+
+                # Print a success message
+                print("Data inserted into the database successfully!")
+
+            except Exception as e:
+                # Print an error message
+                print(f"Error inserting data into the database: {str(e)}")
+
+            finally:
+                # Close the cursor and connection
+                if cursor:
+                    cursor.close()
+                if connection:
+                    connection.close()
+
+            # Update the previous name
+            previous_name = current_name
+        else:
+            continue
+
+        emotion_queue.task_done()
+
+def jarvis(current_text):
+    engine = pyttsx3.init()
+    engine.setProperty('voice', TH_voice_id)
+    engine.say(current_text)
+    engine.runAndWait()
+
 def generate_frames():
-    global current_name, current_emotion, current_date_time, current_text, current_image, current_face, previous_name
+    global frame, previous_name
 
-    # Initialize video capture
     cap = cv2.VideoCapture(0)
-
     face_cascade = cv2.CascadeClassifier(face_cascade_path)
+    face_thread = threading.Thread(target=recognize_face_thread, daemon=True)
+    emotion_thread = threading.Thread(target=analyze_emotion_thread, daemon=True)
+    face_thread.start()
+    emotion_thread.start()
 
     while True:
         # Capture frame-by-frame
@@ -106,102 +229,15 @@ def generate_frames():
         # Detect faces
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
+        if len(faces) == 0:
+        # If no faces detected, set previous_name to "unknown"
+            previous_name = "unknown"
+            
         # Draw rectangles around detected faces
         for (x, y, w, h) in faces:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
-
-            
             face_crop = np.copy(frame[y:y+h, x:x+w])
-            # Recognize face
-            people = recognize_face(face_crop)
-            
-
-            for person in people:
-                if not person['source_x'].empty:
-                    x = person['source_x'][0]
-                    y = person['source_y'][0]
-                    w = person['source_w'][0]
-                    h = person['source_h'][0]
-
-                    try:
-                        distance = person['target_x'][0]
-                        print("Distance:", distance)  # Add this line for debugging
-
-                        if distance > 1:
-                            current_name = person['identity'][0].split('/')[1]
-                        else:
-                            current_name = "Unknown"
-                    except KeyError:
-                        current_name = "Unknown"                           
-                        print("Distance not found")
-            if current_name != previous_name:
-                # Analyze emotion
-                current_emotion = analyze_emotion(face_crop)
-                # Update the previous name
-                previous_name = current_name
-
-                is_success, buffer = cv2.imencode(".jpg", frame)
-                if is_success:
-                    io_buf = io.BytesIO(buffer)
-                    current_image = base64.b64encode(io_buf.getvalue()).decode('utf-8')
-
-                is_success, buffer = cv2.imencode(".jpg", face_crop)
-                if is_success:
-                    io_buf = io.BytesIO(buffer)
-                    current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
-
-                
-                current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                if current_emotion == "happy":
-                    current_text = "ยิ้มหาพ่อเธอหรือ"
-                elif current_emotion == "angry":
-                    current_text = "หน้าบึ้งหาพ่อเธอหรือ"
-                elif current_emotion == "fear":
-                    current_text = "กลัวหาพ่อเธอหรือ"
-                elif current_emotion == "sad":
-                    current_text = "เศร้าหาพ่อเธอหรือ"
-                elif current_emotion == "surprise":
-                    current_text = "แปลกหาพ่อเธอหรือ"
-                elif current_emotion == "neutral":
-                    current_text = "เฉยๆหาพ่อเธอหรือ"
-                elif current_emotion == "disgust":
-                    current_text = "เกลียดหาพ่อเธอหรือ"
-
-                try:
-                    # Connect to the PostgreSQL database
-                    connection = psycopg2.connect(**db_config)
-
-                    # Create a cursor
-                    cursor = connection.cursor()
-
-                    # SQL INSERT statement
-                    insert_query = """
-                        INSERT INTO transactions (
-                            transaction_id, name, date_time, emotion, source_id, face_img, environment_img
-                        ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
-                    """
-                    data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
-
-                    # Execute the query
-                    cursor.execute(insert_query, data_to_insert)
-
-                    # Commit the changes
-                    connection.commit()
-
-                    # Print a success message
-                    print("Data inserted into the database successfully!")
-
-                except Exception as e:
-                    # Print an error message
-                    print(f"Error inserting data into the database: {str(e)}")
-
-                finally:
-                    # Close the cursor and connection
-                    if cursor:
-                        cursor.close()
-                    if connection:
-                        connection.close()
+            face_queue.put(face_crop)
 
         # Encode frame in JPEG format
         ret, buffer = cv2.imencode('.jpg', frame)
@@ -212,13 +248,13 @@ def generate_frames():
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
     cap.release()
-
+    face_queue.join()
+    emotion_queue.join()
 
 @app.route('/')
 def index():
     # Render the HTML template with the video source
     return render_template('index.html')
-
 
 @app.route('/video')
 def video():
@@ -234,7 +270,6 @@ def data():
 def check_db_connection():
     check_postgres_connection()
     return "Check the console for connection status."
-
 
 if __name__ == '__main__':
     # Run the Flask server

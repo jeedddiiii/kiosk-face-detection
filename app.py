@@ -12,48 +12,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 import datetime
 import threading
 import queue
+import requests
 
 TH_voice_id = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_THAI"
-# PostgreSQL database configuration
-db_config = {
-    'dbname': 'facedetection',
-    'user': 'postgres',
-    'password': 'jedi2002',
-    'host': 'localhost',
-    'port': '5432'
-}
-
 # Initialize the Flask app
 app = Flask(__name__)
-
-# Check PostgreSQL connection
-def check_postgres_connection():
-    connection = None  # Initialize connection outside the try block
-    cursor = None
-
-    try:
-        # Connect to the PostgreSQL database
-        connection = psycopg2.connect(**db_config)
-
-        # Create a cursor
-        cursor = connection.cursor()
-
-        # Print a success message
-        print("Connected to PostgreSQL successfully!")
-
-    except Exception as e:
-        # Print an error message
-        print(f"Error connecting to PostgreSQL: {str(e)}")
-
-    finally:
-        # Close the cursor and connection
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
-
-# Check PostgreSQL connection when the application starts
-check_postgres_connection()
 
 # Face detection cascade classifier path (adjust if needed)
 face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
@@ -73,6 +36,22 @@ current_face = None
 
 face_queue = queue.Queue()
 emotion_queue = queue.Queue()
+def send_data(current_name, current_date_time, current_emotion, source_id, current_face, current_image):
+    # The data to be inserted
+    data = {
+        'name': current_name,
+        'date_time': current_date_time,
+        'emotion': current_emotion,
+        'source_id': source_id,
+        'face_img': current_face,
+        'environment_img': current_image
+    }
+
+    # Send the POST request
+    response = requests.post('http://localhost:8080/insert-transaction', json=data)
+
+    # Print the response
+    print(response.json())
 
 def analyze_emotion(face_crop):
     try:
@@ -99,7 +78,6 @@ def recognize_face_thread():
 
     while True:
         face_crop = face_queue.get()
-
         # ตรวจสอบเวลาที่ตรวจจับหน้าล่าสุด
         current_time = datetime.datetime.now()
         time_difference = current_time - last_face_detection_time
@@ -138,7 +116,6 @@ def analyze_emotion_thread():
                 io_buf = io.BytesIO(buffer)
                 current_face = base64.b64encode(io_buf.getvalue()).decode('utf-8')
                 
-
             # Update current date and time
             current_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -158,43 +135,8 @@ def analyze_emotion_thread():
                 current_text = "คุณดูรังเกียจบางอย่างเหรอ"
 
             jarvis(current_text)
-
-            try:
-                # Connect to the PostgreSQL database
-                connection = psycopg2.connect(**db_config)
-
-                # Create a cursor
-                cursor = connection.cursor()
-
-                # SQL INSERT statement
-                insert_query = """
-                    INSERT INTO transactions (
-                        transaction_id, name, date_time, emotion, source_id, face_img, environment_img
-                    ) VALUES (DEFAULT, %s, %s, %s, %s, %s, %s)
-                """
-                data_to_insert = (current_name, current_date_time, current_emotion, 1, current_face, current_image)
-
-                # Execute the query
-                cursor.execute(insert_query, data_to_insert)
-
-                # Commit the changes
-                connection.commit()
-
-                # Print a success message
-                print("Data inserted into the database successfully!")
-
-            except Exception as e:
-                # Print an error message
-                print(f"Error inserting data into the database: {str(e)}")
-
-            finally:
-                # Close the cursor and connection
-                if cursor:
-                    cursor.close()
-                if connection:
-                    connection.close()
-
-            # Update the previous name
+            send_data(current_name, current_date_time, current_emotion, 1, current_face, current_image)
+            
             previous_name = current_name
         else:
             continue
@@ -265,11 +207,6 @@ def video():
 def data():
     # Return the current name and emotion as JSON
     return jsonify(name=current_name, date_time=current_date_time, text=current_text, face=current_face)
-
-@app.route('/check_db_connection')
-def check_db_connection():
-    check_postgres_connection()
-    return "Check the console for connection status."
 
 if __name__ == '__main__':
     # Run the Flask server

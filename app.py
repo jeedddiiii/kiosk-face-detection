@@ -1,6 +1,6 @@
 import os
 import cv2
-from flask import Flask, Response, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify, request
 from deepface import DeepFace
 import numpy as np
 import datetime
@@ -13,6 +13,7 @@ import datetime
 import threading
 import queue
 import requests
+from werkzeug.utils import secure_filename
 
 TH_voice_id = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_THAI"
 # Initialize the Flask app
@@ -162,6 +163,8 @@ def generate_frames():
     while True:
         # Capture frame-by-frame
         ret, frame = cap.read()
+        frame = cv2.flip(frame, 90) 
+
         if not ret:
             break
 
@@ -208,6 +211,32 @@ def data():
     # Return the current name and emotion as JSON
     return jsonify(name=current_name, date_time=current_date_time, text=current_text, face=current_face)
 
+@app.route('/delete_representations', methods=['POST'])
+def delete_representations():
+    try:
+        os.remove('img/representations_vgg_face.pkl')
+        return 'File deleted.'
+    except Exception as e:
+        return f'An error occurred: {str(e)}', 500
+
+@app.route('/store_image', methods=['POST'])
+def store_image():
+    name = request.form['name']
+    image = request.form['image']
+
+    # Create a directory with the name if it doesn't exist
+    if not os.path.exists('img/' + name):
+        os.makedirs('img/' + name)
+
+    # Decode the base64 image
+    image_data = base64.b64decode(image)
+    image_filename = secure_filename('image.jpg')
+
+    # Save the image in the directory
+    with open(os.path.join('img', name, image_filename), 'wb') as f:
+        f.write(image_data)
+
+    return 'Image stored.', 200
 if __name__ == '__main__':
     # Run the Flask server
     app.run(host='0.0.0.0', debug=True)

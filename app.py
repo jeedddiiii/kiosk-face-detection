@@ -14,10 +14,13 @@ import threading
 import queue
 import requests
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 TH_voice_id = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_THAI"
 # Initialize the Flask app
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
 
 # Face detection cascade classifier path (adjust if needed)
 face_cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
@@ -222,19 +225,19 @@ def delete_representations():
 @app.route('/store_image', methods=['POST'])
 def store_image():
     name = request.form['name']
-    image = request.form['image']
+    file = request.files['file']
 
     # Create a directory with the name if it doesn't exist
     if not os.path.exists('img/' + name):
         os.makedirs('img/' + name)
 
-    # Decode the base64 image
-    image_data = base64.b64decode(image)
-    image_filename = secure_filename('image.jpg')
+    # Decode the base64 picture
+    file_data = file.read()
+    file_filename = secure_filename('image.jpg')
 
     # Save the image in the directory
-    with open(os.path.join('img', name, image_filename), 'wb') as f:
-        f.write(image_data)
+    with open(os.path.join('img', name, file_filename), 'wb') as f:
+        f.write(file_data)
 
     return 'Image stored.', 200
 if __name__ == '__main__':

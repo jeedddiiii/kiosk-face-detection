@@ -5,7 +5,6 @@ FacialRecognition
 
 images
 
-haarcascade_frontalface_default.xml
 
 hello.py
 
@@ -13,4 +12,3 @@ test.py
 
 trainer.yml
 
-img
